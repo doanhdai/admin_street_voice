@@ -6,6 +6,7 @@ import {
     FiBarChart2,
     FiRefreshCw,
     FiMic,
+    FiSettings,
 } from 'react-icons/fi';
 
 const navItems = [
@@ -14,6 +15,8 @@ const navItems = [
     { to: '/map', icon: FiMap, label: 'Bản Đồ' },
     { to: '/analytics', icon: FiBarChart2, label: 'Analytics' },
     { to: '/sync', icon: FiRefreshCw, label: 'Đồng bộ dữ liệu' },
+    { to: '/audio', icon: FiMic, label: 'Voice' },
+    { to: '/system', icon: FiSettings, label: 'Hệ Thống' },
 ];
 
 const AdminLayout = ({ children }) => {

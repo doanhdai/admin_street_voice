@@ -10,26 +10,72 @@ import {
     FiImage,
     FiMapPin,
     FiEye,
+    FiSearch,
+    FiChevronLeft,
+    FiChevronRight,
+    FiFilter,
 } from 'react-icons/fi';
 
 const FoodStalls = () => {
     const [stalls, setStalls] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [totalElements, setTotalElements] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+
+    // Filter states
+    const [keyword, setKeyword] = useState('');
+    const [minPrice, setMinPrice] = useState('');
+    const [maxPrice, setMaxPrice] = useState('');
+    const [minRating, setMinRating] = useState('');
+    const [page, setPage] = useState(0);
+    const [size, setSize] = useState(10);
+    const [sortBy, setSortBy] = useState('id,desc');
 
     useEffect(() => {
         fetchStalls();
-    }, []);
+    }, [page, size, sortBy]);
 
     const fetchStalls = async () => {
         try {
             setLoading(true);
-            const res = await stallService.getAll();
-            setStalls(res.data || []);
+            const params = {
+                page,
+                size,
+                sort: sortBy,
+            };
+
+            if (keyword) params.keyword = keyword;
+            if (minPrice) params.minPrice = minPrice;
+            if (maxPrice) params.maxPrice = maxPrice;
+            if (minRating) params.minRating = minRating;
+
+            const res = await stallService.search(params);
+
+            // Assuming the backend returns a Page object: { data: { content: [], totalPages: 0, ... } }
+            // If the user's backend returns the data directly: res.data = { content: [], ... }
+            const pageData = res.data?.data || res.data;
+
+            if (pageData && pageData.content) {
+                setStalls(pageData.content);
+                setTotalPages(pageData.totalPages || 0);
+                setTotalElements(pageData.totalElements || 0);
+            } else {
+                setStalls(Array.isArray(pageData) ? pageData : []);
+                setTotalPages(0);
+                setTotalElements(Array.isArray(pageData) ? pageData.length : 0);
+            }
         } catch (err) {
             toast.error('Không thể tải danh sách quán');
+            console.error(err);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setPage(0);
+        fetchStalls();
     };
 
     const handleDelete = async (id, name) => {
@@ -43,147 +89,231 @@ const FoodStalls = () => {
         }
     };
 
-    if (loading) {
+    const renderPagination = () => {
+        if (totalPages <= 1) return null;
+
         return (
-            <div className="space-y-6">
-                <div className="h-10 w-48 bg-gray-200 rounded-xl animate-pulse" />
-                <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
-                    ))}
+            <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-100">
+                <p className="text-sm text-gray-500">
+                    Hiển thị <span className="font-medium text-gray-900">{stalls.length}</span> / <span className="font-medium text-gray-900">{totalElements}</span> quán
+                </p>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setPage(p => Math.max(0, p - 1))}
+                        disabled={page === 0}
+                        className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all"
+                    >
+                        <FiChevronLeft />
+                    </button>
+                    <div className="flex items-center px-4 text-sm font-medium text-gray-700">
+                        Trang {page + 1} / {totalPages}
+                    </div>
+                    <button
+                        onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                        disabled={page === totalPages - 1}
+                        className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all"
+                    >
+                        <FiChevronRight />
+                    </button>
                 </div>
             </div>
         );
-    }
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Quán Ăn</h1>
-                    <p className="text-gray-500">{stalls.length} quán ăn</p>
+                    <p className="text-gray-500">{totalElements} quán ăn trong hệ thống</p>
                 </div>
                 <Link
                     to="/stalls/new"
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25"
                 >
                     <FiPlus size={18} /> Thêm quán
                 </Link>
             </div>
 
+            {/* Filters */}
+            <div className="bg-white rounded-2xl shadow-sm p-4">
+                <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4 items-center">
+                    <div className="w-full lg:flex-2 relative">
+                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Tìm kiếm quán ăn..."
+                            className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={keyword}
+                            onChange={(e) => setKeyword(e.target.value)}
+                        />
+                    </div>
+                    <div className="w-full lg:flex-2 flex gap-2">
+                        <input
+                            type="number"
+                            placeholder="Giá từ"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={minPrice}
+                            onChange={(e) => setMinPrice(e.target.value)}
+                        />
+                        <input
+                            type="number"
+                            placeholder="Giá đến"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(e.target.value)}
+                        />
+                    </div>
+                    <div className="w-full lg:flex-1">
+                        <input
+                            type="number"
+                            placeholder="Rating từ"
+                            step="0.1"
+                            max="5"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={minRating}
+                            onChange={(e) => setMinRating(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        className="w-full lg:w-[42px] h-[42px] flex items-center justify-center bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all font-medium shrink-0"
+                        title="Lọc"
+                    >
+                        <FiFilter size={18} />
+                    </button>
+                </form>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                {stalls.length === 0 ? (
+                {loading ? (
+                    <div className="p-12 space-y-4">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="h-16 bg-gray-50 rounded-xl animate-pulse" />
+                        ))}
+                    </div>
+                ) : stalls.length === 0 ? (
                     <div className="p-12 text-center">
                         <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <FiMapPin className="text-indigo-500" size={28} />
                         </div>
-                        <p className="text-gray-500 mb-4">Chưa có quán nào</p>
-                        <Link
-                            to="/stalls/new"
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700"
-                        >
-                            <FiPlus /> Thêm quán đầu tiên
-                        </Link>
+                        <p className="text-gray-500 mb-4">Không tìm thấy quán ăn nào phù hợp</p>
+                        {(keyword || minPrice || maxPrice || minRating) && (
+                            <button
+                                onClick={() => {
+                                    setKeyword(''); setMinPrice(''); setMaxPrice(''); setMinRating('');
+                                    setPage(0);
+                                }}
+                                className="text-indigo-600 font-medium hover:underline"
+                            >
+                                Xóa bộ lọc
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-100">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Quán ăn</th>
-                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Toạ độ</th>
-                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Media</th>
-                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Mô tả</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {stalls.map((stall) => (
-                                <tr key={stall.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            {stall.imageUrl ? (
-                                                <img
-                                                    src={stall.imageUrl}
-                                                    alt=""
-                                                    className="w-12 h-12 rounded-lg object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-12 h-12 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
-                                                    <FiMapPin className="text-indigo-400" size={18} />
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b border-gray-100">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Quán ăn</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Toạ độ</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Media</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Mô tả</th>
+                                        <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {stalls.map((stall) => (
+                                        <tr key={stall.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    {stall.imageUrl ? (
+                                                        <img
+                                                            src={stall.imageUrl}
+                                                            alt=""
+                                                            className="w-12 h-12 rounded-lg object-cover shadow-sm"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-12 h-12 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
+                                                            <FiMapPin className="text-indigo-400" size={18} />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{stall.name}</p>
+                                                        <p className="text-[10px] text-gray-400 uppercase tracking-wider">ID: {stall.id}</p>
+                                                    </div>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <p className="font-medium text-gray-900">{stall.name}</p>
-                                                <p className="text-xs text-gray-400">ID: {stall.id}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {stall.latitude != null ? (
-                                            <div className="text-xs text-gray-600 space-y-0.5">
-                                                <p>Lat: <span className="font-mono">{stall.latitude?.toFixed(5)}</span></p>
-                                                <p>Lng: <span className="font-mono">{stall.longitude?.toFixed(5)}</span></p>
-                                            </div>
-                                        ) : (
-                                            <span className="text-gray-400 text-sm">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${stall.audioUrl
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-gray-100 text-gray-400'
-                                                    }`}
-                                            >
-                                                <FiMic size={11} />
-                                                Audio
-                                            </span>
-                                            <span
-                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${stall.imageUrl
-                                                        ? 'bg-blue-100 text-blue-700'
-                                                        : 'bg-gray-100 text-gray-400'
-                                                    }`}
-                                            >
-                                                <FiImage size={11} />
-                                                Ảnh
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="text-gray-500 text-sm line-clamp-2 max-w-xs">{stall.description || '—'}</p>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-1">
-                                            {stall.audioUrl && (
-                                                <a
-                                                    href={stall.audioUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg"
-                                                    title="Nghe Audio"
-                                                >
-                                                    <FiEye size={18} />
-                                                </a>
-                                            )}
-                                            <Link
-                                                to={`/stalls/${stall.id}/edit`}
-                                                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
-                                            >
-                                                <FiEdit size={18} />
-                                            </Link>
-                                            <button
-                                                onClick={() => handleDelete(stall.id, stall.name)}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                            >
-                                                <FiTrash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {stall.latitude != null ? (
+                                                    <div className="text-[11px] text-gray-500 font-mono space-y-0.5">
+                                                        <p>Lat: {stall.latitude?.toFixed(5)}</p>
+                                                        <p>Lng: {stall.longitude?.toFixed(5)}</p>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-300 text-sm">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${stall.audioUrl
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-400'
+                                                            }`}
+                                                    >
+                                                        <FiMic size={10} />
+                                                        Audio
+                                                    </span>
+                                                    <span
+                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${stall.imageUrl
+                                                            ? 'bg-blue-100 text-blue-700'
+                                                            : 'bg-gray-100 text-gray-400'
+                                                            }`}
+                                                    >
+                                                        <FiImage size={10} />
+                                                        Ảnh
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-gray-500 text-sm line-clamp-2 max-w-xs">{stall.description || '—'}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {stall.audioUrl && (
+                                                        <a
+                                                            href={stall.audioUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                            title="Nghe Audio"
+                                                        >
+                                                            <FiEye size={18} />
+                                                        </a>
+                                                    )}
+                                                    <Link
+                                                        to={`/stalls/${stall.id}/edit`}
+                                                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FiEdit size={18} />
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleDelete(stall.id, stall.name)}
+                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FiTrash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {renderPagination()}
+                    </>
                 )}
             </div>
         </div>

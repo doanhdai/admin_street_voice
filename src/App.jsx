@@ -9,6 +9,8 @@ import StallForm from './pages/StallForm';
 import Analytics from './pages/Analytics';
 import SyncData from './pages/SyncData';
 import MapView from './pages/MapView';
+import AudioManagement from './pages/AudioManagement';
+import SystemAdmin from './pages/SystemAdmin';
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/sync" element={<SyncData />} />
           <Route path="/map" element={<MapView />} />
+          <Route path="/audio" element={<AudioManagement />} />
+          <Route path="/system" element={<SystemAdmin />} />
         </Routes>
       </AdminLayout>
       <ToastContainer
