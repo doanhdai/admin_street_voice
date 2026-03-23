@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { stallService } from '../services/api';
 import { toast } from 'react-toastify';
-import { FiMapPin, FiList, FiRefreshCw, FiSearch, FiX, FiEdit, FiMic, FiImage, FiNavigation } from 'react-icons/fi';
+import { FiMapPin, FiList, FiRefreshCw, FiSearch, FiX, FiEdit, FiMic, FiImage, FiNavigation, FiGlobe, FiVolume2, FiVolumeX, FiPlay, FiPause } from 'react-icons/fi';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -16,11 +16,37 @@ L.Icon.Default.mergeOptions({
 
 const VIETNAM_CENTER = [16.047079, 108.20623]; // Đà Nẵng trung tâm mặc định
 const DEFAULT_ZOOM = 13;
+const API_BASE_URL = 'http://localhost:8080';
+
+const LANGUAGES = [
+    { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+    { code: 'en', label: 'English',    flag: '🇺🇸' },
+    { code: 'ja', label: '日本語',      flag: '🇯🇵' },
+    { code: 'ko', label: '한국어',      flag: '🇰🇷' },
+    { code: 'zh', label: '中文',        flag: '🇨🇳' },
+];
 
 const MapView = () => {
     const [stalls, setStalls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedStall, setSelectedStall] = useState(null);
+    const [selectedLanguage, setSelectedLanguage] = useState('vi');
+    const [fetchingDetail, setFetchingDetail] = useState(false);
+    
+    // Spotify-style Player State
+    const [activeAudio, setActiveAudio] = useState({
+        url: null,
+        name: '',
+        imageUrl: null,
+        lang: 'vi',
+        isPlaying: false,
+        duration: 0,
+        currentTime: 0,
+        stallId: null,
+        isBuffering: false
+    });
+    
+    const audioRef = useRef(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [stats, setStats] = useState({ total: 0, withCoords: 0, withAudio: 0 });
 
@@ -60,12 +86,12 @@ const MapView = () => {
     // Fetch dữ liệu
     useEffect(() => {
         fetchStalls();
-    }, []);
+    }, [selectedLanguage]);
 
     const fetchStalls = async () => {
         try {
             setLoading(true);
-            const res = await stallService.getAll();
+            const res = await stallService.getAll({ lang: selectedLanguage });
             const data = res.data || [];
             setStalls(data);
             setStats({
@@ -79,6 +105,129 @@ const MapView = () => {
             setLoading(false);
         }
     };
+
+    // Helper function to render localized popup content
+    const renderPopupContent = (stall) => {
+        const hasAudio = !!stall.audioUrl;
+        const hasImage = !!stall.imageUrl;
+        return `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 4px; min-width: 240px;">
+                ${hasImage ? `<img src="${stall.imageUrl}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none'" />` : ''}
+                <h3 style="margin:0 0 4px; font-size:15px; font-weight:700; color:#111827;">${stall.name}</h3>
+                <p style="margin:0 0 8px; font-size:12px; color:#6b7280; line-height:1.5;">${stall.description || 'Chưa có mô tả'}</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span style="padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:${hasAudio ? '#dcfce7' : '#f1f5f9'}; color:${hasAudio ? '#166534' : '#94a3b8'};">
+                        🎵 Audio ${hasAudio ? 'Có' : 'Chưa có'}
+                    </span>
+                    <span style="padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:${hasImage ? '#dbeafe' : '#f1f5f9'}; color:${hasImage ? '#1e40af' : '#94a3b8'};">
+                        🖼 Ảnh ${hasImage ? 'Có' : 'Chưa có'}
+                    </span>
+                    <span style="padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:#f5f3ff; color:#7c3aed;">
+                        🌍 ${LANGUAGES.find(l => l.code === selectedLanguage)?.flag} ${selectedLanguage.toUpperCase()}
+                    </span>
+                </div>
+                <div style="font-size:11px; color:#9ca3af; font-family:monospace;">
+                    ${stall.latitude?.toFixed(6)}, ${stall.longitude?.toFixed(6)}
+                </div>
+            </div>
+        `;
+    };
+
+    // Spotify-style Audio Control Logic
+    const togglePlay = () => {
+        if (!audioRef.current || !activeAudio.url) return;
+        
+        if (activeAudio.isPlaying) {
+            audioRef.current.pause();
+            setActiveAudio(prev => ({ ...prev, isPlaying: false }));
+        } else {
+            audioRef.current.play().then(() => {
+                setActiveAudio(prev => ({ ...prev, isPlaying: true }));
+            }).catch(e => console.log('Play failed'));
+        }
+    };
+
+    const handleTimeUpdate = () => {
+        if (audioRef.current) {
+            setActiveAudio(prev => ({
+                ...prev,
+                currentTime: audioRef.current.currentTime,
+                duration: audioRef.current.duration || 0
+            }));
+        }
+    };
+
+    const handleProgressChange = (e) => {
+        const time = parseFloat(e.target.value);
+        if (audioRef.current) {
+            audioRef.current.currentTime = time;
+            setActiveAudio(prev => ({ ...prev, currentTime: time }));
+        }
+    };
+
+    const formatTime = (time) => {
+        if (isNaN(time)) return '0:00';
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    // Marker click logic updated to set active audio
+    const handleStallClick = async (stall, marker) => {
+        setSelectedStall(stall);
+        try {
+            setFetchingDetail(true);
+            const res = await stallService.getById(stall.id, { lang: selectedLanguage });
+            const detail = res.data?.data || res.data;
+            
+            // Update popup content with localized data
+            if (marker && marker.getPopup()) {
+                marker.getPopup().setContent(renderPopupContent(detail));
+                marker.openPopup();
+            }
+
+            // Sync with Player Bar
+            if (detail.audioUrl) {
+                // Ensure absolute URL
+                const absoluteAudioUrl = detail.audioUrl.startsWith('http') 
+                    ? detail.audioUrl 
+                    : `${API_BASE_URL}${detail.audioUrl}`;
+
+                setActiveAudio({
+                    url: absoluteAudioUrl,
+                    name: detail.name,
+                    imageUrl: detail.imageUrl,
+                    lang: selectedLanguage,
+                    isPlaying: true,
+                    duration: 0,
+                    currentTime: 0,
+                    stallId: stall.id,
+                    isBuffering: true
+                });
+                
+                if (audioRef.current) {
+                    audioRef.current.src = absoluteAudioUrl;
+                    audioRef.current.load();
+                    audioRef.current.play().catch(e => {
+                        console.log('Auto-play blocked');
+                        setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching localization:', err);
+        } finally {
+            setFetchingDetail(false);
+        }
+    };
+
+    // Auto-update popup if language changes while a stall is selected
+    useEffect(() => {
+        if (selectedStall) {
+            const marker = markersRef.current[selectedStall.id];
+            handleStallClick(selectedStall, marker);
+        }
+    }, [selectedLanguage]);
 
     // Vẽ markers lên bản đồ khi data thay đổi
     useEffect(() => {
@@ -126,28 +275,11 @@ const MapView = () => {
 
             const marker = L.marker([stall.latitude, stall.longitude], { icon }).addTo(mapInstanceRef.current);
 
-            // Popup content
-            const popup = L.popup({ maxWidth: 280, className: 'stall-popup' }).setContent(`
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 4px;">
-                    ${hasImage ? `<img src="${stall.imageUrl}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none'" />` : ''}
-                    <h3 style="margin:0 0 4px; font-size:15px; font-weight:700; color:#111827;">${stall.name}</h3>
-                    <p style="margin:0 0 8px; font-size:12px; color:#6b7280;">${stall.description || 'Chưa có mô tả'}</p>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-                        <span style="padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:${hasAudio ? '#dcfce7' : '#f1f5f9'}; color:${hasAudio ? '#166534' : '#94a3b8'};">
-                            🎵 Audio ${hasAudio ? 'Có' : 'Chưa có'}
-                        </span>
-                        <span style="padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; background:${hasImage ? '#dbeafe' : '#f1f5f9'}; color:${hasImage ? '#1e40af' : '#94a3b8'};">
-                            🖼 Ảnh ${hasImage ? 'Có' : 'Chưa có'}
-                        </span>
-                    </div>
-                    <div style="font-size:11px; color:#9ca3af; font-family:monospace;">
-                        ${stall.latitude?.toFixed(6)}, ${stall.longitude?.toFixed(6)}
-                    </div>
-                </div>
-            `);
+            // Initial popup content (empty or loading-friendly)
+            const popup = L.popup({ maxWidth: 280, className: 'stall-popup' }).setContent(renderPopupContent(stall));
 
             marker.bindPopup(popup);
-            marker.on('click', () => setSelectedStall(stall));
+            marker.on('click', () => handleStallClick(stall, marker));
             marker.on('popupclose', () => setSelectedStall(null));
 
             markersRef.current[stall.id] = marker;
@@ -172,9 +304,9 @@ const MapView = () => {
             toast.warn('Quán này chưa có toạ độ');
             return;
         }
+        const marker = markersRef.current[stall.id];
         mapInstanceRef.current?.flyTo([stall.latitude, stall.longitude], 17, { duration: 1 });
-        markersRef.current[stall.id]?.openPopup();
-        setSelectedStall(stall);
+        handleStallClick(stall, marker);
     };
 
     return (
@@ -191,6 +323,25 @@ const MapView = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Language Selector in Header */}
+                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-sm mr-2">
+                        {LANGUAGES.map(lang => (
+                            <button
+                                key={lang.code}
+                                onClick={() => setSelectedLanguage(lang.code)}
+                                title={lang.label}
+                                className={`flex flex-col items-center justify-center w-10 py-1 rounded-lg transition-all ${
+                                    selectedLanguage === lang.code
+                                        ? 'bg-white shadow-md text-indigo-600'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                }`}
+                            >
+                                <span className="text-base leading-none">{lang.flag}</span>
+                                <span className="text-[8px] font-bold mt-0.5 uppercase leading-none">{lang.code}</span>
+                            </button>
+                        ))}
+                    </div>
+
                     <button
                         onClick={fetchStalls}
                         className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
@@ -347,6 +498,95 @@ const MapView = () => {
                     )}
                 </div>
             </div>
+
+            {/* Spotify-style Player Bar */}
+            {activeAudio.url && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-500">
+                    <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 ring-1 ring-black/5 p-4 flex items-center gap-6">
+                        {/* Stall Info */}
+                        <div className="flex items-center gap-4 w-1/4 min-w-0">
+                            <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg shrink-0">
+                                {activeAudio.imageUrl ? (
+                                    <img src={activeAudio.imageUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-indigo-100 flex items-center justify-center text-indigo-400">
+                                        <FiImage size={24} />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="text-sm font-bold text-gray-900 truncate uppercase tracking-tight">
+                                    {activeAudio.name}
+                                </h4>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-lg">{LANGUAGES.find(l => l.code === activeAudio.lang)?.flag}</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase">{activeAudio.lang}</span>
+                                    <div className="w-1 h-1 bg-gray-300 rounded-full mx-1"></div>
+                                    <span className={`text-[10px] font-bold uppercase ${activeAudio.isPlaying ? 'text-green-500' : 'text-gray-400'}`}>
+                                        {activeAudio.isPlaying ? 'Đang phát' : 'Đang tạm dừng'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Middle Controls: Play/Pause & Progress */}
+                        <div className="flex-1 flex flex-col items-center gap-2">
+                            <div className="flex items-center gap-6">
+                                <button 
+                                    onClick={togglePlay}
+                                    className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-gray-200"
+                                    disabled={activeAudio.isBuffering}
+                                >
+                                    {activeAudio.isBuffering ? (
+                                        <FiRefreshCw className="animate-spin" size={24} />
+                                    ) : activeAudio.isPlaying ? (
+                                        <FiPause size={24} />
+                                    ) : (
+                                        <FiPlay className="ml-1" size={24} />
+                                    )}
+                                </button>
+                            </div>
+                            <div className="w-full flex items-center gap-3">
+                                <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.currentTime)}</span>
+                                <input 
+                                    type="range"
+                                    min="0"
+                                    max={activeAudio.duration || 100}
+                                    value={activeAudio.currentTime}
+                                    onChange={handleProgressChange}
+                                    className="flex-1 h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-700 transition-all [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[0.75px] shadow-sm"
+                                />
+                                <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.duration)}</span>
+                            </div>
+                        </div>
+
+                        {/* Right: Close/Actions */}
+                        <div className="w-1/4 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setActiveAudio(prev => ({ ...prev, url: null, isPlaying: false }))}
+                                className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                                title="Đóng trình phát"
+                            >
+                                <FiX size={20} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Audio Player (Hidden) */}
+            <audio 
+                ref={audioRef} 
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }))}
+                onLoadedMetadata={handleTimeUpdate}
+                onWaiting={() => setActiveAudio(prev => ({ ...prev, isBuffering: true }))}
+                onCanPlay={() => setActiveAudio(prev => ({ ...prev, isBuffering: false }))}
+                onError={() => {
+                    toast.error("Không thể tải audio. Vui lòng thử lại.");
+                    setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
+                }}
+            />
         </div>
     );
 };

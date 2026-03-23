@@ -6,14 +6,16 @@ const api = axios.create({
 });
 
 export const stallService = {
-    getAll: () => api.get('/api/v1/stalls'),
-    getById: (id) => api.get(`/api/v1/stalls/${id}`),
+    getAll: (params) => api.get('/api/v1/stalls', { params }),
+    getById: (id, params) => api.get(`/api/v1/stalls/${id}`, { params }),
     create: (data) => api.post('/api/v1/stalls', data),
     update: (id, data) => api.put(`/api/v1/stalls/${id}`, data),
     delete: (id) => api.delete(`/api/v1/stalls/${id}`),
     search: (params) => api.get('/api/v1/stalls/search', { params }),
     sync: (params) => api.get('/api/v1/stalls/sync', { params }),
     nearby: (lat, lon) => api.get('/api/v1/stalls/nearby', { params: { lat, lon } }),
+    generateAudio: (id, lang) => api.post(`/api/v1/stalls/${id}/audio/generate`, null, { params: { lang } }),
+    generateAllAudio: (id) => api.post(`/api/v1/stalls/${id}/audio/generate-all`),
 };
 
 export const adminService = {
