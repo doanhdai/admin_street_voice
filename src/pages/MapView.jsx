@@ -226,6 +226,43 @@ const MapView = () => {
         if (selectedStall) {
             const marker = markersRef.current[selectedStall.id];
             handleStallClick(selectedStall, marker);
+        } else if (activeAudio.stallId && activeAudio.isPlaying) {
+            // Reload the audio if something is playing but popup is closed
+            const fetchAudioDetail = async () => {
+                try {
+                    const res = await stallService.getById(activeAudio.stallId, { lang: selectedLanguage });
+                    const detail = res.data?.data || res.data;
+                    
+                    if (detail.audioUrl) {
+                        const absoluteAudioUrl = detail.audioUrl.startsWith('http') 
+                            ? detail.audioUrl 
+                            : `${API_BASE_URL}${detail.audioUrl}`;
+        
+                        setActiveAudio(prev => ({
+                            ...prev,
+                            url: absoluteAudioUrl,
+                            name: detail.name,
+                            lang: selectedLanguage,
+                            isPlaying: true,
+                            duration: 0,
+                            currentTime: 0,
+                            isBuffering: true
+                        }));
+                        
+                        if (audioRef.current) {
+                            audioRef.current.src = absoluteAudioUrl;
+                            audioRef.current.load();
+                            audioRef.current.play().catch(e => {
+                                console.log('Auto-play blocked');
+                                setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching localization for active audio:', err);
+                }
+            };
+            fetchAudioDetail();
         }
     }, [selectedLanguage]);
 
@@ -496,13 +533,11 @@ const MapView = () => {
                             </div>
                         </div>
                     )}
-                </div>
-            </div>
 
-            {/* Spotify-style Player Bar */}
-            {activeAudio.url && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-500">
-                    <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 ring-1 ring-black/5 p-4 flex items-center gap-6">
+                    {/* Spotify-style Player Bar */}
+                    {activeAudio.url && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-500">
+                            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 ring-1 ring-black/5 p-4 flex items-center gap-6">
                         {/* Stall Info */}
                         <div className="flex items-center gap-4 w-1/4 min-w-0">
                             <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg shrink-0">
@@ -573,10 +608,12 @@ const MapView = () => {
                     </div>
                 </div>
             )}
+            </div>
+        </div>
 
-            {/* Audio Player (Hidden) */}
-            <audio 
-                ref={audioRef} 
+        {/* Audio Player (Hidden) */}
+        <audio 
+            ref={audioRef} 
                 onTimeUpdate={handleTimeUpdate}
                 onEnded={() => setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }))}
                 onLoadedMetadata={handleTimeUpdate}
