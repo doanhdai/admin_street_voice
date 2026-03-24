@@ -43,7 +43,8 @@ const MapView = () => {
         duration: 0,
         currentTime: 0,
         stallId: null,
-        isBuffering: false
+        isBuffering: false,
+        error: null
     });
     
     const audioRef = useRef(null);
@@ -202,7 +203,8 @@ const MapView = () => {
                     duration: 0,
                     currentTime: 0,
                     stallId: stall.id,
-                    isBuffering: true
+                    isBuffering: true,
+                    error: null
                 });
                 
                 if (audioRef.current) {
@@ -213,6 +215,20 @@ const MapView = () => {
                         setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
                     });
                 }
+            } else {
+                // Không có audio cho ngôn ngữ này
+                setActiveAudio({
+                    url: null,
+                    name: detail.name,
+                    imageUrl: detail.imageUrl,
+                    lang: selectedLanguage,
+                    isPlaying: false,
+                    duration: 0,
+                    currentTime: 0,
+                    stallId: stall.id,
+                    isBuffering: false,
+                    error: 'Không tìm thấy audio cho ngôn ngữ này'
+                });
             }
         } catch (err) {
             console.error('Error fetching localization:', err);
@@ -246,7 +262,8 @@ const MapView = () => {
                             isPlaying: true,
                             duration: 0,
                             currentTime: 0,
-                            isBuffering: true
+                            isBuffering: true,
+                            error: null
                         }));
                         
                         if (audioRef.current) {
@@ -257,6 +274,17 @@ const MapView = () => {
                                 setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
                             });
                         }
+                    } else {
+                        // Cập nhật trạng thái lỗi nếu chuyển ngôn ngữ mà không có audio
+                        setActiveAudio(prev => ({
+                            ...prev,
+                            url: null,
+                            name: detail.name,
+                            lang: selectedLanguage,
+                            isPlaying: false,
+                            isBuffering: false,
+                            error: 'Không tìm thấy audio cho ngôn ngữ này'
+                        }));
                     }
                 } catch (err) {
                     console.error('Error fetching localization for active audio:', err);
@@ -535,7 +563,7 @@ const MapView = () => {
                     )}
 
                     {/* Spotify-style Player Bar */}
-                    {activeAudio.url && (
+                    {activeAudio.stallId && (
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-500">
                             <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 ring-1 ring-black/5 p-4 flex items-center gap-6">
                         {/* Stall Info */}
@@ -566,33 +594,42 @@ const MapView = () => {
 
                         {/* Middle Controls: Play/Pause & Progress */}
                         <div className="flex-1 flex flex-col items-center gap-2">
-                            <div className="flex items-center gap-6">
-                                <button 
-                                    onClick={togglePlay}
-                                    className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-gray-200"
-                                    disabled={activeAudio.isBuffering}
-                                >
-                                    {activeAudio.isBuffering ? (
-                                        <FiRefreshCw className="animate-spin" size={24} />
-                                    ) : activeAudio.isPlaying ? (
-                                        <FiPause size={24} />
-                                    ) : (
-                                        <FiPlay className="ml-1" size={24} />
-                                    )}
-                                </button>
-                            </div>
-                            <div className="w-full flex items-center gap-3">
-                                <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.currentTime)}</span>
-                                <input 
-                                    type="range"
-                                    min="0"
-                                    max={activeAudio.duration || 100}
-                                    value={activeAudio.currentTime}
-                                    onChange={handleProgressChange}
-                                    className="flex-1 h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-700 transition-all [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[0.75px] shadow-sm"
-                                />
-                                <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.duration)}</span>
-                            </div>
+                            {activeAudio.error ? (
+                                <div className="flex items-center gap-2 text-red-500 bg-red-50/50 px-4 py-2 rounded-xl">
+                                    <FiVolumeX size={18} />
+                                    <span className="text-sm font-bold uppercase tracking-wide">{activeAudio.error}</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-6">
+                                        <button 
+                                            onClick={togglePlay}
+                                            className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-gray-200"
+                                            disabled={activeAudio.isBuffering}
+                                        >
+                                            {activeAudio.isBuffering ? (
+                                                <FiRefreshCw className="animate-spin" size={24} />
+                                            ) : activeAudio.isPlaying ? (
+                                                <FiPause size={24} />
+                                            ) : (
+                                                <FiPlay className="ml-1" size={24} />
+                                            )}
+                                        </button>
+                                    </div>
+                                    <div className="w-full flex items-center gap-3">
+                                        <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.currentTime)}</span>
+                                        <input 
+                                            type="range"
+                                            min="0"
+                                            max={activeAudio.duration || 100}
+                                            value={activeAudio.currentTime}
+                                            onChange={handleProgressChange}
+                                            className="flex-1 h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-700 transition-all [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[0.75px] shadow-sm"
+                                        />
+                                        <span className="text-[11px] font-mono text-gray-400">{formatTime(activeAudio.duration)}</span>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Right: Close/Actions */}
@@ -620,8 +657,12 @@ const MapView = () => {
                 onWaiting={() => setActiveAudio(prev => ({ ...prev, isBuffering: true }))}
                 onCanPlay={() => setActiveAudio(prev => ({ ...prev, isBuffering: false }))}
                 onError={() => {
-                    toast.error("Không thể tải audio. Vui lòng thử lại.");
-                    setActiveAudio(prev => ({ ...prev, isPlaying: false, isBuffering: false }));
+                    setActiveAudio(prev => ({ 
+                        ...prev, 
+                        isPlaying: false, 
+                        isBuffering: false,
+                        error: 'Không tìm thấy audio cho ngôn ngữ này'
+                    }));
                 }}
             />
         </div>

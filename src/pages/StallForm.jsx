@@ -10,6 +10,10 @@ import {
     FiImage,
     FiFileText,
     FiType,
+    FiGlobe,
+    FiPlay,
+    FiPause,
+    FiVolume2
 } from 'react-icons/fi';
 
 const inputClass =
@@ -24,6 +28,7 @@ const StallForm = () => {
 
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(isEdit);
+    const [playingUrl, setPlayingUrl] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -31,7 +36,18 @@ const StallForm = () => {
         audioUrl: '',
         latitude: '',
         longitude: '',
+        localizations: []
     });
+
+    const LANGUAGES = [
+        { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+        { code: 'en', label: 'English',    flag: '🇺🇸' },
+        { code: 'ja', label: '日本語',      flag: '🇯🇵' },
+        { code: 'ko', label: '한국어',      flag: '🇰🇷' },
+        { code: 'zh', label: '中文',        flag: '🇨🇳' },
+    ];
+
+    const API_BASE_URL = 'http://localhost:8080';
 
     useEffect(() => {
         if (isEdit) fetchStall();
@@ -48,6 +64,7 @@ const StallForm = () => {
                 audioUrl: d.audioUrl || '',
                 latitude: d.latitude != null ? String(d.latitude) : '',
                 longitude: d.longitude != null ? String(d.longitude) : '',
+                localizations: d.localizations || []
             });
         } catch {
             toast.error('Không thể tải thông tin quán');
@@ -192,20 +209,57 @@ const StallForm = () => {
                     <div>
                         <label className={labelClass}>
                             <FiMic className="inline mr-1.5" />
-                            URL Audio
+                            Danh sách Audio (Theo ngôn ngữ)
                         </label>
-                        <input
-                            type="url"
-                            value={formData.audioUrl}
-                            onChange={set('audioUrl')}
-                            className={inputClass}
-                            placeholder="https://example.com/audio.mp3"
-                        />
-                        {formData.audioUrl && (
-                            <audio controls className="mt-3 w-full" key={formData.audioUrl}>
-                                <source src={formData.audioUrl} />
-                            </audio>
-                        )}
+                        
+                        <div className="space-y-3 mt-2">
+                            {LANGUAGES.map(lang => {
+                                const loc = formData.localizations.find(l => l.languageCode === lang.code);
+                                // Fallback: if it's 'vi' and no localization, check formData.audioUrl
+                                let audioUrl = loc?.audioUrl;
+                                if (!audioUrl && lang.code === 'vi' && formData.audioUrl) {
+                                    audioUrl = formData.audioUrl;
+                                }
+
+                                const hasAudio = !!audioUrl;
+                                const absoluteAudioUrl = hasAudio 
+                                    ? (audioUrl.startsWith('http') ? audioUrl : `${API_BASE_URL}${audioUrl}`)
+                                    : null;
+                                const isCurrentPlaying = playingUrl === absoluteAudioUrl && absoluteAudioUrl !== null;
+
+                                return (
+                                    <div key={lang.code} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">{lang.flag}</span>
+                                                <span className="text-xs font-bold text-gray-700 uppercase">{lang.label}</span>
+                                            </div>
+                                            {hasAudio && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPlayingUrl(isCurrentPlaying ? null : absoluteAudioUrl)}
+                                                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                                        isCurrentPlaying 
+                                                            ? 'bg-red-500 text-white shadow-md' 
+                                                            : 'bg-indigo-600 text-white shadow-md hover:scale-110'
+                                                    }`}
+                                                >
+                                                    {isCurrentPlaying ? <FiPause size={12} /> : <FiPlay size={12} className="ml-0.5" />}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={audioUrl || 'Chưa có audio...'}
+                                                className="flex-1 bg-white border border-gray-100 rounded-lg px-3 py-1.5 text-[11px] font-mono text-gray-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -245,6 +299,20 @@ const StallForm = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Hidden Audio element for playback */}
+                {playingUrl && (
+                    <audio 
+                        src={playingUrl} 
+                        autoPlay 
+                        onEnded={() => setPlayingUrl(null)}
+                        onError={() => {
+                            toast.error("Không thể phát audio");
+                            setPlayingUrl(null);
+                        }}
+                        className="hidden"
+                    />
+                )}
 
                 <div className="flex gap-3">
                     <button
