@@ -8,6 +8,17 @@ const MyStall = () => {
     const [stall, setStall] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        name: '',
+        description: '',
+        address: '',
+        latitude: '',
+        longitude: '',
+        minPrice: 0,
+        maxPrice: 0,
+        triggerRadius: 15,
+    });
 
     useEffect(() => {
         fetchMyStall();
@@ -17,11 +28,50 @@ const MyStall = () => {
         try {
             setLoading(true);
             const res = await api.get('/api/v1/stall-owner/my-stall');
-            setStall(res.data);
+            if (res.data?.hasStall === false) {
+                setStall(null);
+            } else {
+                setStall(res.data);
+            }
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Lỗi khi tải thông tin quán');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCreateField = (field) => (e) => {
+        const value = e.target.value;
+        setCreateForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleCreateStall = async (e) => {
+        e.preventDefault();
+
+        if (!createForm.name || createForm.latitude === '' || createForm.longitude === '') {
+            toast.error('Vui lòng nhập đủ tên quán và tọa độ');
+            return;
+        }
+
+        try {
+            setCreating(true);
+            await api.post('/api/v1/stall-owner/update-stall', {
+                name: createForm.name,
+                description: createForm.description,
+                address: createForm.address,
+                latitude: Number(createForm.latitude),
+                longitude: Number(createForm.longitude),
+                minPrice: Number(createForm.minPrice || 0),
+                maxPrice: Number(createForm.maxPrice || 0),
+                triggerRadius: Number(createForm.triggerRadius || 15),
+            });
+
+            toast.success('Đã gửi đăng ký quán ăn, chờ admin phê duyệt');
+            fetchMyStall();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Lỗi khi gửi đăng ký quán');
+        } finally {
+            setCreating(false);
         }
     };
 
@@ -41,8 +91,82 @@ const MyStall = () => {
 
     if (!stall) {
         return (
-            <div className="text-center py-12">
-                <p className="text-slate-600">Bạn chưa có quán nào được tạo</p>
+            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-2">Đăng ký quán ăn</h2>
+                <p className="text-slate-600 mb-6">Điền thông tin quán, hệ thống sẽ gửi yêu cầu ở trạng thái chờ admin duyệt.</p>
+
+                <form onSubmit={handleCreateStall} className="space-y-4">
+                    <input
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                        placeholder="Tên quán"
+                        value={createForm.name}
+                        onChange={handleCreateField('name')}
+                    />
+                    <textarea
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                        placeholder="Mô tả"
+                        rows={3}
+                        value={createForm.description}
+                        onChange={handleCreateField('description')}
+                    />
+                    <input
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                        placeholder="Địa chỉ"
+                        value={createForm.address}
+                        onChange={handleCreateField('address')}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <input
+                            type="number"
+                            step="any"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            placeholder="Latitude"
+                            value={createForm.latitude}
+                            onChange={handleCreateField('latitude')}
+                        />
+                        <input
+                            type="number"
+                            step="any"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            placeholder="Longitude"
+                            value={createForm.longitude}
+                            onChange={handleCreateField('longitude')}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            placeholder="Giá min"
+                            value={createForm.minPrice}
+                            onChange={handleCreateField('minPrice')}
+                        />
+                        <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            placeholder="Giá max"
+                            value={createForm.maxPrice}
+                            onChange={handleCreateField('maxPrice')}
+                        />
+                        <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            placeholder="Bán kính"
+                            value={createForm.triggerRadius}
+                            onChange={handleCreateField('triggerRadius')}
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={creating}
+                        className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg disabled:opacity-60"
+                    >
+                        {creating ? 'Đang gửi...' : 'Gửi đăng ký quán ăn'}
+                    </button>
+                </form>
             </div>
         );
     }

@@ -91,6 +91,7 @@ export const analyticsService = {
 
 export const authService = {
     register: (payload) => api.post('/api/v1/auth/register', payload),
+    registerOwner: (payload) => api.post('/api/v1/auth/register-owner', payload),
     login: (payload) => api.post('/api/v1/auth/login', payload),
     refresh: (refreshToken) => api.post('/api/v1/auth/refresh', { refreshToken }),
     logout: () => api.post('/api/v1/auth/logout'),
