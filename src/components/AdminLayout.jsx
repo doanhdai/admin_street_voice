@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
     FiHome,
     FiMapPin,
@@ -7,10 +7,17 @@ import {
     FiRefreshCw,
     FiMic,
     FiSettings,
+    FiLogOut,
+    FiCheckSquare,
+    FiUsers,
 } from 'react-icons/fi';
+import { authService } from '../services/api';
+import { clearTokens } from '../services/authStorage';
 
 const navItems = [
     { to: '/', icon: FiHome, label: 'Dashboard' },
+    { to: '/approvals', icon: FiCheckSquare, label: 'Phê duyệt' },
+    { to: '/accounts', icon: FiUsers, label: 'Tài khoản' },
     { to: '/stalls', icon: FiMapPin, label: 'Quán Ăn' },
     { to: '/map', icon: FiMap, label: 'Bản Đồ' },
     { to: '/analytics', icon: FiBarChart2, label: 'Analytics' },
@@ -20,6 +27,19 @@ const navItems = [
 ];
 
 const AdminLayout = ({ children }) => {
+    const navigate = useNavigate();
+
+    const onLogout = async () => {
+        try {
+            await authService.logout();
+        } catch {
+            // Ignore API logout failure and clear local session anyway.
+        } finally {
+            clearTokens();
+            navigate('/login', { replace: true });
+        }
+    };
+
     return (
         <div className="flex min-h-screen bg-gray-50">
             {/* Sidebar */}
@@ -56,6 +76,12 @@ const AdminLayout = ({ children }) => {
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
+                    <button
+                        onClick={onLogout}
+                        className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100"
+                    >
+                        <FiLogOut size={16} /> Dang xuat
+                    </button>
                     <p className="text-xs text-gray-400 text-center">Backend: localhost:8080</p>
                 </div>
             </aside>

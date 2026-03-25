@@ -1,9 +1,60 @@
 import axios from 'axios';
+import { clearTokens, getAccessToken, getRefreshToken, setTokens } from './authStorage';
 
 const api = axios.create({
     baseURL: 'http://localhost:8080',
     headers: { 'Content-Type': 'application/json' },
 });
+
+api.interceptors.request.use((config) => {
+    const token = getAccessToken();
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+let refreshPromise = null;
+
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        const status = error?.response?.status;
+
+        if (status !== 401 || originalRequest?._retry) {
+            return Promise.reject(error);
+        }
+
+        const refreshToken = getRefreshToken();
+        if (!refreshToken) {
+            clearTokens();
+            return Promise.reject(error);
+        }
+
+        originalRequest._retry = true;
+
+        try {
+            if (!refreshPromise) {
+                refreshPromise = axios.post('http://localhost:8080/api/v1/auth/refresh', { refreshToken });
+            }
+
+            const refreshRes = await refreshPromise;
+            setTokens({
+                accessToken: refreshRes.data.accessToken,
+                refreshToken: refreshRes.data.refreshToken,
+            });
+
+            originalRequest.headers.Authorization = `Bearer ${refreshRes.data.accessToken}`;
+            return api(originalRequest);
+        } catch (refreshError) {
+            clearTokens();
+            return Promise.reject(refreshError);
+        } finally {
+            refreshPromise = null;
+        }
+    }
+);
 
 export const stallService = {
     getAll: (params) => api.get('/api/v1/stalls', { params }),
@@ -27,10 +78,23 @@ export const adminService = {
 
     // System Group
     importJson: (data) => api.post('/api/v1/admin/import-json', data),
+
+    // Account Management
+    listOwnerAccounts: () => api.get('/api/v1/admin/accounts/owners'),
+    listAvailableStalls: () => api.get('/api/v1/admin/accounts/available-stalls'),
+    createOwnerAccount: (data) => api.post('/api/v1/admin/accounts/owners', data),
 };
 
 export const analyticsService = {
     track: (data) => api.post('/api/v1/analytics/track', data),
+};
+
+export const authService = {
+    register: (payload) => api.post('/api/v1/auth/register', payload),
+    login: (payload) => api.post('/api/v1/auth/login', payload),
+    refresh: (refreshToken) => api.post('/api/v1/auth/refresh', { refreshToken }),
+    logout: () => api.post('/api/v1/auth/logout'),
+    getGoogleOAuthUrl: () => 'http://localhost:8080/oauth2/authorization/google',
 };
 
 export default api;
