@@ -86,7 +86,22 @@ export const adminService = {
 };
 
 export const analyticsService = {
+    getActiveUsers: (minutes = 5) => api.get('/api/v1/analytics/active-users', { params: { minutes } }),
+    getPoiRanking: ({ from, to, limit = 10 }) =>
+        api.get('/api/v1/analytics/poi-ranking', { params: { from, to, limit } }),
+    getHourlyHeatmap: (stallId) =>
+        api.get('/api/v1/analytics/hourly-heatmap', {
+            params: stallId ? { stallId } : undefined,
+        }),
+    getAudioEngagement: (stallId) =>
+        api.get('/api/v1/analytics/audio-engagement', {
+            params: stallId ? { stallId } : undefined,
+        }),
+    getSessionStats: () => api.get('/api/v1/analytics/session-stats'),
+    getDailySummary: ({ from, to }) =>
+        api.get('/api/v1/analytics/daily-summary', { params: { from, to } }),
     track: (data) => api.post('/api/v1/analytics/track', data),
+    trackBatch: (data) => api.post('/api/v1/analytics/track/batch', data),
 };
 
 export const authService = {

@@ -20,6 +20,10 @@ const MyStall = () => {
         triggerRadius: 15,
     });
 
+    const isRejectedStall = stall?.status === 'INACTIVE';
+    const isPendingStall = stall?.status === 'PENDING';
+    const shouldShowRegistrationForm = !stall || isRejectedStall;
+
     useEffect(() => {
         fetchMyStall();
     }, []);
@@ -53,6 +57,16 @@ const MyStall = () => {
             return;
         }
 
+        if (Number(createForm.maxPrice || 0) < Number(createForm.minPrice || 0)) {
+            toast.error('Giá tối đa phải lớn hơn hoặc bằng giá tối thiểu');
+            return;
+        }
+
+        if (Number(createForm.triggerRadius || 0) <= 0) {
+            toast.error('Bán kính kích hoạt phải lớn hơn 0');
+            return;
+        }
+
         try {
             setCreating(true);
             await api.post('/api/v1/stall-owner/update-stall', {
@@ -81,6 +95,20 @@ const MyStall = () => {
         toast.success('Cập nhật quán thành công, chờ admin duyệt');
     };
 
+    useEffect(() => {
+        if (!isRejectedStall) return;
+        setCreateForm({
+            name: stall.name || '',
+            description: stall.description || '',
+            address: stall.address || '',
+            latitude: stall.latitude ?? '',
+            longitude: stall.longitude ?? '',
+            minPrice: stall.minPrice ?? 0,
+            maxPrice: stall.maxPrice ?? 0,
+            triggerRadius: stall.triggerRadius ?? 15,
+        });
+    }, [isRejectedStall, stall]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -89,11 +117,24 @@ const MyStall = () => {
         );
     }
 
-    if (!stall) {
+    if (shouldShowRegistrationForm) {
         return (
             <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-xl font-bold text-slate-900 mb-2">Đăng ký quán ăn</h2>
-                <p className="text-slate-600 mb-6">Điền thông tin quán, hệ thống sẽ gửi yêu cầu ở trạng thái chờ admin duyệt.</p>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">
+                    {isRejectedStall ? 'Đăng ký lại quán ăn' : 'Đăng ký quán ăn'}
+                </h2>
+                <p className="text-slate-600 mb-6">
+                    {isRejectedStall
+                        ? 'Yêu cầu trước đã bị từ chối. Vui lòng chỉnh sửa thông tin và gửi lại để admin duyệt.'
+                        : 'Điền thông tin quán, hệ thống sẽ gửi yêu cầu ở trạng thái chờ admin duyệt.'}
+                </p>
+
+                {isRejectedStall && (
+                    <div className="mb-5 bg-rose-50 border border-rose-200 rounded-lg p-4">
+                        <p className="text-sm text-rose-800 font-medium">Yêu cầu đăng ký trước đó chưa được duyệt.</p>
+                        <p className="text-sm text-rose-700 mt-1">Bạn có thể tiếp tục đăng ký lại cho đến khi quán được duyệt thành công.</p>
+                    </div>
+                )}
 
                 <form onSubmit={handleCreateStall} className="space-y-4">
                     <input
@@ -136,35 +177,49 @@ const MyStall = () => {
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
-                        <input
-                            type="number"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                            placeholder="Giá min"
-                            value={createForm.minPrice}
-                            onChange={handleCreateField('minPrice')}
-                        />
-                        <input
-                            type="number"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                            placeholder="Giá max"
-                            value={createForm.maxPrice}
-                            onChange={handleCreateField('maxPrice')}
-                        />
-                        <input
-                            type="number"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                            placeholder="Bán kính"
-                            value={createForm.triggerRadius}
-                            onChange={handleCreateField('triggerRadius')}
-                        />
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">Giá tối thiểu (VND)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                placeholder="VD: 25000"
+                                value={createForm.minPrice}
+                                onChange={handleCreateField('minPrice')}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">Giá tối đa (VND)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                placeholder="VD: 120000"
+                                value={createForm.maxPrice}
+                                onChange={handleCreateField('maxPrice')}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">Bán kính kích hoạt (m)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                placeholder="VD: 15"
+                                value={createForm.triggerRadius}
+                                onChange={handleCreateField('triggerRadius')}
+                            />
+                        </div>
                     </div>
+
+                    <p className="text-xs text-slate-500">Giá giúp người dùng ước lượng chi phí. Bán kính kích hoạt là khoảng cách để audio tự phát khi người dùng đến gần quán.</p>
 
                     <button
                         type="submit"
                         disabled={creating}
                         className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg disabled:opacity-60"
                     >
-                        {creating ? 'Đang gửi...' : 'Gửi đăng ký quán ăn'}
+                        {creating ? 'Đang gửi...' : isRejectedStall ? 'Gửi lại đăng ký quán ăn' : 'Gửi đăng ký quán ăn'}
                     </button>
                 </form>
             </div>
@@ -174,7 +229,7 @@ const MyStall = () => {
     const statusBadgeColor = {
         ACTIVE: 'bg-green-100 text-green-800',
         PENDING: 'bg-yellow-100 text-yellow-800',
-        INACTIVE: 'bg-gray-100 text-gray-800',
+        INACTIVE: 'bg-rose-100 text-rose-800',
     };
 
     return (
@@ -189,7 +244,7 @@ const MyStall = () => {
                             <p className="text-slate-600 mt-1">{stall.address}</p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadgeColor[stall.status] || statusBadgeColor.ACTIVE}`}>
-                            {stall.status === 'ACTIVE' ? '✓ Hoạt động' : stall.status === 'PENDING' ? '⏳ Chờ duyệt' : '✕ Không hoạt động'}
+                            {stall.status === 'ACTIVE' ? '✓ Hoạt động' : stall.status === 'PENDING' ? '⏳ Chờ duyệt' : '✕ Bị từ chối'}
                         </span>
                     </div>
 
@@ -235,10 +290,11 @@ const MyStall = () => {
                     <div className="p-6 bg-slate-50 border-t border-slate-200">
                         <button
                             onClick={() => setIsEditModalOpen(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition"
+                            disabled={isPendingStall}
+                            className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <FiEdit2 size={18} />
-                            Sửa thông tin quán
+                            {isPendingStall ? 'Đang chờ duyệt, tạm khóa chỉnh sửa' : 'Sửa thông tin quán'}
                         </button>
                     </div>
                 </div>
