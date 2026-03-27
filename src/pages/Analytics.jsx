@@ -462,7 +462,7 @@ const Analytics = () => {
                 </div>
             </div>
 
-            <div className={cardClass}>
+            {/* <div className={cardClass}>
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="font-bold text-slate-900">Session Quality</h2>
@@ -517,7 +517,7 @@ const Analytics = () => {
                         </div>
                     </div>
                 )}
-            </div>
+            </div> */}
 
             {isBusy && (
                 <div className="fixed right-6 bottom-6 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm inline-flex items-center gap-2">
@@ -525,14 +525,14 @@ const Analytics = () => {
                 </div>
             )}
 
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-start gap-3">
+            {/* <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-start gap-3">
                 <FiBarChart2 className="text-emerald-600 mt-0.5 shrink-0" size={18} />
                 <div>
                     <p className="text-sm font-medium text-emerald-800">API đang sử dụng</p>
                     <p className="text-xs text-emerald-700 mt-0.5">/active-users, /poi-ranking, /hourly-heatmap, /audio-engagement, /session-stats, /daily-summary</p>
                     <p className="text-xs text-emerald-700 mt-1">Dashboard hiện đã gọi đầy đủ các endpoint analytics chính cho admin.</p>
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 };

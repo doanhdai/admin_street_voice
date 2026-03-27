@@ -1,7 +1,7 @@
-import { FiLogOut, FiHome } from 'react-icons/fi';
+﻿import { FiHome, FiLogOut } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import { clearTokens } from '../services/authStorage';
 import { toast } from 'react-toastify';
+import { clearTokens } from '../services/authStorage';
 
 const StallOwnerLayout = ({ children }) => {
     const navigate = useNavigate();
@@ -13,28 +13,30 @@ const StallOwnerLayout = ({ children }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            {/* Header */}
-            <div className="bg-white shadow-sm border-b border-slate-200">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <FiHome className="text-cyan-600" size={24} />
-                        <h1 className="text-xl font-bold text-slate-900">Street Voice - Quán Của Tôi</h1>
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-indigo-50/40">
+            <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+                <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+                            <FiHome size={20} />
+                        </div>
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">Street Voice</p>
+                            <h1 className="text-lg font-bold text-slate-900 sm:text-xl">Quán Của Tôi</h1>
+                        </div>
                     </div>
+
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                     >
-                        <FiLogOut size={18} />
+                        <FiLogOut size={16} />
                         Đăng xuất
                     </button>
                 </div>
-            </div>
+            </header>
 
-            {/* Content */}
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                {children}
-            </div>
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">{children}</main>
         </div>
     );
 };

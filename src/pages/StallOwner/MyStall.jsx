@@ -1,32 +1,87 @@
-import { useState, useEffect } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FiEdit2, FiLoader } from 'react-icons/fi';
+import {
+    FiAlertTriangle,
+    FiCheckCircle,
+    FiClock,
+    FiDollarSign,
+    FiEdit2,
+    FiLoader,
+    FiMapPin,
+    FiNavigation,
+    FiSend,
+    FiTag,
+} from 'react-icons/fi';
 import api from '../../services/api';
 import StallEditModal from '../../components/StallEditModal';
+
+const defaultCreateForm = {
+    name: '',
+    description: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+    minPrice: 0,
+    maxPrice: 0,
+    triggerRadius: 15,
+};
+
+const statusMeta = {
+    ACTIVE: {
+        label: 'Đang hoạt động',
+        chip: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+        panel: 'bg-emerald-50 border border-emerald-200 text-emerald-800',
+        icon: FiCheckCircle,
+        note: 'Quán của bạn đang hiển thị cho người dùng trong ứng dụng.',
+    },
+    PENDING: {
+        label: 'Chờ duyệt',
+        chip: 'bg-amber-100 text-amber-800 border border-amber-200',
+        panel: 'bg-amber-50 border border-amber-200 text-amber-800',
+        icon: FiClock,
+        note: 'Yêu cầu cập nhật đang được admin xem xét. Bạn chưa thể chỉnh sửa thêm.',
+    },
+    INACTIVE: {
+        label: 'Bị từ chối',
+        chip: 'bg-rose-100 text-rose-800 border border-rose-200',
+        panel: 'bg-rose-50 border border-rose-200 text-rose-800',
+        icon: FiAlertTriangle,
+        note: 'Yêu cầu hiện tại chưa được duyệt. Vui lòng chỉnh sửa và gửi lại.',
+    },
+};
+
+const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`;
 
 const MyStall = () => {
     const [stall, setStall] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [createForm, setCreateForm] = useState({
-        name: '',
-        description: '',
-        address: '',
-        latitude: '',
-        longitude: '',
-        minPrice: 0,
-        maxPrice: 0,
-        triggerRadius: 15,
-    });
+    const [createForm, setCreateForm] = useState(defaultCreateForm);
 
     const isRejectedStall = stall?.status === 'INACTIVE';
     const isPendingStall = stall?.status === 'PENDING';
     const shouldShowRegistrationForm = !stall || isRejectedStall;
 
+    const currentStatus = useMemo(() => statusMeta[stall?.status] || statusMeta.ACTIVE, [stall]);
+
     useEffect(() => {
         fetchMyStall();
     }, []);
+
+    useEffect(() => {
+        if (!isRejectedStall) return;
+        setCreateForm({
+            name: stall?.name || '',
+            description: stall?.description || '',
+            address: stall?.address || '',
+            latitude: stall?.latitude ?? '',
+            longitude: stall?.longitude ?? '',
+            minPrice: stall?.minPrice ?? 0,
+            maxPrice: stall?.maxPrice ?? 0,
+            triggerRadius: stall?.triggerRadius ?? 15,
+        });
+    }, [isRejectedStall, stall]);
 
     const fetchMyStall = async () => {
         try {
@@ -80,7 +135,7 @@ const MyStall = () => {
                 triggerRadius: Number(createForm.triggerRadius || 15),
             });
 
-            toast.success('Đã gửi đăng ký quán ăn, chờ admin phê duyệt');
+            toast.success('Đã gửi yêu cầu, vui lòng chờ admin phê duyệt');
             fetchMyStall();
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Lỗi khi gửi đăng ký quán');
@@ -92,244 +147,266 @@ const MyStall = () => {
     const handleEditSuccess = () => {
         setIsEditModalOpen(false);
         fetchMyStall();
-        toast.success('Cập nhật quán thành công, chờ admin duyệt');
+        toast.success('Cập nhật thành công, yêu cầu đang chờ admin duyệt');
     };
-
-    useEffect(() => {
-        if (!isRejectedStall) return;
-        setCreateForm({
-            name: stall.name || '',
-            description: stall.description || '',
-            address: stall.address || '',
-            latitude: stall.latitude ?? '',
-            longitude: stall.longitude ?? '',
-            minPrice: stall.minPrice ?? 0,
-            maxPrice: stall.maxPrice ?? 0,
-            triggerRadius: stall.triggerRadius ?? 15,
-        });
-    }, [isRejectedStall, stall]);
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <FiLoader className="animate-spin text-cyan-600" size={32} />
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-slate-700 shadow-sm">
+                    <FiLoader className="animate-spin text-indigo-600" size={20} />
+                    <span className="font-medium">Đang tải dữ liệu quán...</span>
+                </div>
             </div>
         );
     }
 
     if (shouldShowRegistrationForm) {
         return (
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-xl font-bold text-slate-900 mb-2">
-                    {isRejectedStall ? 'Đăng ký lại quán ăn' : 'Đăng ký quán ăn'}
-                </h2>
-                <p className="text-slate-600 mb-6">
-                    {isRejectedStall
-                        ? 'Yêu cầu trước đã bị từ chối. Vui lòng chỉnh sửa thông tin và gửi lại để admin duyệt.'
-                        : 'Điền thông tin quán, hệ thống sẽ gửi yêu cầu ở trạng thái chờ admin duyệt.'}
-                </p>
+            <div className="mx-auto max-w-4xl space-y-6">
+                <section className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-6 text-white shadow-lg sm:px-8">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-100">Street Voice Owner Portal</p>
+                    <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+                        {isRejectedStall ? 'Đăng ký lại quán ăn' : 'Đăng ký quán ăn của bạn'}
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm text-indigo-100 sm:text-base">
+                        {isRejectedStall
+                            ? 'Yêu cầu trước đó chưa được duyệt. Cập nhật lại thông tin theo góp ý và gửi lại để admin xét duyệt.'
+                            : 'Điền đầy đủ thông tin quán để gửi lên hệ thống. Sau khi duyệt, quán sẽ hiển thị cho người dùng.'}
+                    </p>
+                </section>
 
-                {isRejectedStall && (
-                    <div className="mb-5 bg-rose-50 border border-rose-200 rounded-lg p-4">
-                        <p className="text-sm text-rose-800 font-medium">Yêu cầu đăng ký trước đó chưa được duyệt.</p>
-                        <p className="text-sm text-rose-700 mt-1">Bạn có thể tiếp tục đăng ký lại cho đến khi quán được duyệt thành công.</p>
-                    </div>
-                )}
-
-                <form onSubmit={handleCreateStall} className="space-y-4">
-                    <input
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                        placeholder="Tên quán"
-                        value={createForm.name}
-                        onChange={handleCreateField('name')}
-                    />
-                    <textarea
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                        placeholder="Mô tả"
-                        rows={3}
-                        value={createForm.description}
-                        onChange={handleCreateField('description')}
-                    />
-                    <input
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                        placeholder="Địa chỉ"
-                        value={createForm.address}
-                        onChange={handleCreateField('address')}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <input
-                            type="number"
-                            step="any"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                            placeholder="Latitude"
-                            value={createForm.latitude}
-                            onChange={handleCreateField('latitude')}
-                        />
-                        <input
-                            type="number"
-                            step="any"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                            placeholder="Longitude"
-                            value={createForm.longitude}
-                            onChange={handleCreateField('longitude')}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Giá tối thiểu (VND)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                                placeholder="VD: 25000"
-                                value={createForm.minPrice}
-                                onChange={handleCreateField('minPrice')}
-                            />
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+                    {isRejectedStall && (
+                        <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                            Yêu cầu cũ chưa được duyệt. Bạn có thể chỉnh sửa thông tin và gửi lại ngay.
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Giá tối đa (VND)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                                placeholder="VD: 120000"
-                                value={createForm.maxPrice}
-                                onChange={handleCreateField('maxPrice')}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Bán kính kích hoạt (m)</label>
-                            <input
-                                type="number"
-                                min="1"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                                placeholder="VD: 15"
-                                value={createForm.triggerRadius}
-                                onChange={handleCreateField('triggerRadius')}
-                            />
-                        </div>
-                    </div>
+                    )}
 
-                    <p className="text-xs text-slate-500">Giá giúp người dùng ước lượng chi phí. Bán kính kích hoạt là khoảng cách để audio tự phát khi người dùng đến gần quán.</p>
+                    <form onSubmit={handleCreateStall} className="space-y-6">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="sm:col-span-2">
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Tên quán</label>
+                                <input
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="Ví dụ: Bún bò Vĩnh Khánh"
+                                    value={createForm.name}
+                                    onChange={handleCreateField('name')}
+                                />
+                            </div>
 
-                    <button
-                        type="submit"
-                        disabled={creating}
-                        className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg disabled:opacity-60"
-                    >
-                        {creating ? 'Đang gửi...' : isRejectedStall ? 'Gửi lại đăng ký quán ăn' : 'Gửi đăng ký quán ăn'}
-                    </button>
-                </form>
+                            <div className="sm:col-span-2">
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Mô tả quán</label>
+                                <textarea
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="Món nổi bật, phong cách quán, giờ đông khách..."
+                                    rows={4}
+                                    value={createForm.description}
+                                    onChange={handleCreateField('description')}
+                                />
+                            </div>
+
+                            <div className="sm:col-span-2">
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Địa chỉ</label>
+                                <input
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="Ví dụ: 123 Vĩnh Khánh, Quận 4"
+                                    value={createForm.address}
+                                    onChange={handleCreateField('address')}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Latitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="10.762622"
+                                    value={createForm.latitude}
+                                    onChange={handleCreateField('latitude')}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Longitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="106.695877"
+                                    value={createForm.longitude}
+                                    onChange={handleCreateField('longitude')}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Giá tối thiểu (VND)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="25000"
+                                    value={createForm.minPrice}
+                                    onChange={handleCreateField('minPrice')}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Giá tối đa (VND)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="120000"
+                                    value={createForm.maxPrice}
+                                    onChange={handleCreateField('maxPrice')}
+                                />
+                            </div>
+
+                            <div className="sm:col-span-2">
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Bán kính kích hoạt audio (m)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                    placeholder="15"
+                                    value={createForm.triggerRadius}
+                                    onChange={handleCreateField('triggerRadius')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                            Khoảng giá giúp khách ước lượng chi phí. Bán kính kích hoạt là khoảng cách để audio tự phát khi khách đến gần quán.
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={creating}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {creating ? <FiLoader className="animate-spin" /> : <FiSend />}
+                            {creating
+                                ? 'Đang gửi yêu cầu...'
+                                : isRejectedStall
+                                    ? 'Gửi lại đăng ký quán ăn'
+                                    : 'Gửi đăng ký quán ăn'}
+                        </button>
+                    </form>
+                </section>
             </div>
         );
     }
 
-    const statusBadgeColor = {
-        ACTIVE: 'bg-green-100 text-green-800',
-        PENDING: 'bg-yellow-100 text-yellow-800',
-        INACTIVE: 'bg-rose-100 text-rose-800',
-    };
+    const StatusIcon = currentStatus.icon;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Stall Info */}
-            <div className="lg:col-span-2">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    {/* Header with Status */}
-                    <div className="p-6 border-b border-slate-200 flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900">{stall.name}</h2>
-                            <p className="text-slate-600 mt-1">{stall.address}</p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadgeColor[stall.status] || statusBadgeColor.ACTIVE}`}>
-                            {stall.status === 'ACTIVE' ? '✓ Hoạt động' : stall.status === 'PENDING' ? '⏳ Chờ duyệt' : '✕ Bị từ chối'}
-                        </span>
+        <div className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Quán của tôi</p>
+                        <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{stall.name}</h2>
+                        <p className="mt-1 text-sm text-slate-600">{stall.address || 'Chưa cập nhật địa chỉ'}</p>
                     </div>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${currentStatus.chip}`}>
+                        <StatusIcon size={14} />
+                        {currentStatus.label}
+                    </span>
+                </div>
 
-                    {/* Content */}
-                    <div className="p-6 space-y-6">
-                        {/* Description */}
-                        <div>
-                            <h3 className="text-sm font-semibold text-slate-700 mb-2">Mô tả</h3>
-                            <p className="text-slate-600 leading-relaxed">{stall.description || 'Chưa có mô tả'}</p>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Khoảng giá</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800">{formatCurrency(stall.minPrice)} - {formatCurrency(stall.maxPrice)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Bán kính kích hoạt</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800">{stall.triggerRadius || 0} m</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Tọa độ</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800">
+                            {stall.latitude != null && stall.longitude != null ? `${stall.latitude}, ${stall.longitude}` : 'Chưa cập nhật'}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <div className="grid gap-6 lg:grid-cols-3">
+                <section className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+                    <h3 className="text-lg font-bold text-slate-900">Thông tin chi tiết</h3>
+
+                    <div className="mt-5 space-y-5">
+                        <div className="rounded-xl border border-slate-200 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-slate-700">
+                                <FiTag className="text-indigo-600" />
+                                <p className="text-sm font-semibold">Mô tả quán</p>
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-600">{stall.description || 'Chưa có mô tả cho quán.'}</p>
                         </div>
 
-                        {/* Pricing */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <h3 className="text-sm font-semibold text-slate-700 mb-2">Giá tối thiểu</h3>
-                                <p className="text-lg font-bold text-cyan-600">
-                                    {stall.minPrice?.toLocaleString('vi-VN')} đ
-                                </p>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="rounded-xl border border-slate-200 p-4">
+                                <div className="mb-2 flex items-center gap-2 text-slate-700">
+                                    <FiDollarSign className="text-indigo-600" />
+                                    <p className="text-sm font-semibold">Giá tối thiểu</p>
+                                </div>
+                                <p className="text-base font-bold text-indigo-600">{formatCurrency(stall.minPrice)}</p>
                             </div>
-                            <div>
-                                <h3 className="text-sm font-semibold text-slate-700 mb-2">Giá tối đa</h3>
-                                <p className="text-lg font-bold text-cyan-600">
-                                    {stall.maxPrice?.toLocaleString('vi-VN')} đ
-                                </p>
+                            <div className="rounded-xl border border-slate-200 p-4">
+                                <div className="mb-2 flex items-center gap-2 text-slate-700">
+                                    <FiDollarSign className="text-indigo-600" />
+                                    <p className="text-sm font-semibold">Giá tối đa</p>
+                                </div>
+                                <p className="text-base font-bold text-indigo-600">{formatCurrency(stall.maxPrice)}</p>
                             </div>
                         </div>
 
-                        {/* Additional Info */}
-                        <div>
-                            <h3 className="text-sm font-semibold text-slate-700 mb-2">Vị trí</h3>
-                            <p className="text-slate-600">
-                                Bán kính kích hoạt: {stall.triggerRadius}m
-                            </p>
-                            {(stall.latitude != null && stall.longitude != null) && (
-                                <p className="text-slate-500 text-sm mt-1">
-                                    Tọa độ: {stall.latitude}, {stall.longitude}
+                        <div className="rounded-xl border border-slate-200 p-4">
+                            <div className="mb-2 flex items-center gap-2 text-slate-700">
+                                <FiMapPin className="text-indigo-600" />
+                                <p className="text-sm font-semibold">Địa điểm và geofence</p>
+                            </div>
+                            <p className="text-sm text-slate-600">Bán kính kích hoạt: <span className="font-semibold text-slate-800">{stall.triggerRadius || 0} m</span></p>
+                            {stall.latitude != null && stall.longitude != null && (
+                                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                                    <FiNavigation size={14} />
+                                    {stall.latitude}, {stall.longitude}
                                 </p>
                             )}
                         </div>
                     </div>
 
-                    {/* Edit Button */}
-                    <div className="p-6 bg-slate-50 border-t border-slate-200">
+                    <div className="mt-6 border-t border-slate-200 pt-6">
                         <button
                             onClick={() => setIsEditModalOpen(true)}
                             disabled={isPendingStall}
-                            className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <FiEdit2 size={18} />
-                            {isPendingStall ? 'Đang chờ duyệt, tạm khóa chỉnh sửa' : 'Sửa thông tin quán'}
+                            {isPendingStall ? 'Đang chờ duyệt, tạm khóa chỉnh sửa' : 'Chỉnh sửa thông tin quán'}
                         </button>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            {/* Sidebar - Status Info */}
-            <div className="lg:col-span-1">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <h3 className="font-bold text-slate-900">Thông tin cập nhật</h3>
+                <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+                    <h3 className="text-lg font-bold text-slate-900">Trạng thái duyệt</h3>
 
-                    {stall.status === 'PENDING' && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                            <p className="text-sm text-yellow-800">
-                                Quán của bạn đang chờ admin duyệt cập nhật. Vui lòng chờ...
-                            </p>
-                        </div>
-                    )}
-
-                    {stall.status === 'ACTIVE' && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <p className="text-sm text-green-800">
-                                Quán của bạn đang hoạt động và hiển thị cho người dùng.
-                            </p>
-                        </div>
-                    )}
-
-                    <div className="text-xs text-slate-500 space-y-2">
-                        <p>💡 Khi bạn sửa thông tin, quán sẽ chuyển sang trạng thái "Chờ duyệt"</p>
-                        <p>✓ Admin sẽ duyệt thay đổi của bạn</p>
-                        <p>📱 Sau khi được duyệt, thay đổi sẽ hiển thị cho người dùng</p>
+                    <div className={`mt-4 rounded-xl p-4 text-sm ${currentStatus.panel}`}>
+                        <p className="font-semibold">{currentStatus.label}</p>
+                        <p className="mt-1">{currentStatus.note}</p>
                     </div>
-                </div>
+
+                    <div className="mt-5 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p>1. Khi chỉnh sửa, quán sẽ chuyển sang trạng thái chờ duyệt.</p>
+                        <p>2. Admin sẽ kiểm tra nội dung và phê duyệt thay đổi.</p>
+                        <p>3. Sau khi duyệt, thông tin mới sẽ hiển thị cho người dùng.</p>
+                    </div>
+                </aside>
             </div>
 
-            {/* Edit Modal */}
             {isEditModalOpen && (
                 <StallEditModal
                     stall={stall}
